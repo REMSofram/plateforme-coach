@@ -9,6 +9,7 @@ import {
 
 import Home from "./pages/Home";
 import Login from "./pages/Login";
+import ClientDetail from "./pages/ClientDetail"; // ✅ Ajouté
 
 function App() {
   const [user, setUser] = useState(null);
@@ -17,7 +18,7 @@ function App() {
   useEffect(() => {
     // Check si un utilisateur est déjà connecté
     const getUser = async () => {
-      const { data } = await supabase.auth.getUser(); // 🔧 correction ici
+      const { data } = await supabase.auth.getUser();
       setUser(data?.user || null);
       setCheckingSession(false);
     };
@@ -44,6 +45,12 @@ function App() {
 
         {/* Page de login : redirige si déjà connecté */}
         <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
+
+        {/* ✅ Nouvelle route dynamique pour les pages client */}
+        <Route
+          path="/client/:id"
+          element={user ? <ClientDetail /> : <Navigate to="/login" />}
+        />
       </Routes>
     </Router>
   );

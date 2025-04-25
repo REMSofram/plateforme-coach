@@ -19,35 +19,62 @@ const Home = () => {
 
   const fetchClients = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("users")
-      .select("*")
-      .order("full_name", { ascending: true });
 
-    if (error) {
+    const session = await supabase.auth.getSession();
+    const jwt = session.data.session?.access_token;
+
+    const res = await fetch(
+      "https://csottmuidhsyamnabzww.supabase.co/rest/v1/users?select=*&order=full_name.asc",
+      {
+        headers: {
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${jwt}`,
+        },
+      }
+    );
+
+    if (!res.ok) {
+      const error = await res.json();
       console.error("Erreur de récupération :", error);
-    } else {
-      setClients(data);
+      setLoading(false);
+      return;
     }
+
+    const data = await res.json();
+    setClients(data);
     setLoading(false);
   };
 
   const handleCreateClient = async () => {
-    const { error } = await supabase.from("users").insert([
-      {
-        full_name: "Jean Test",
-        email: "jean.test@example.com",
-        role: "client",
-      },
-    ]);
+    const { email, prenom, nom } = formData;
+    const password = "secure-password"; // temporaire ou à générer
 
-    if (error) {
-      console.error("Erreur Supabase :", error);
-      alert("Erreur lors de la création du client.");
-    } else {
-      alert("Client ajouté avec succès !");
-      fetchClients();
+    const session = await supabase.auth.getSession();
+    const jwt = session.data.session?.access_token;
+
+    const response = await fetch(
+      "https://csottmuidhsyamnabzww.functions.supabase.co/create-client",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${jwt}`,
+        },
+        body: JSON.stringify({ email, password, prenom, nom }),
+      }
+    );
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      alert(`❌ Erreur : ${result.error || JSON.stringify(result.details)}`);
+      return;
     }
+
+    alert("✅ Client créé avec succès !");
+    setShowForm(false);
+    setFormData({ prenom: "", nom: "", email: "" });
+    fetchClients(); // Refresh la liste
   };
 
   const handleLogout = async () => {
