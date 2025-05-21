@@ -50,16 +50,26 @@ serve(async (req: Request) => {
 
     // Lecture du corps de la requête
     const body = await req.json();
-    console.log("Corps de la requête reçu:", body);
+    console.log("Corps de la requête reçu:", JSON.stringify(body, null, 2));
 
-    const { email, password, prenom, nom } = body;
+    const { email, prenom, nom, role } = body;
 
-    if (!email || !password || !prenom || !nom) {
-      console.error("Champs manquants:", { email, password, prenom, nom });
+    // Validation des champs
+    const missingFields = [];
+    if (!email) missingFields.push("email");
+    if (!prenom) missingFields.push("prenom");
+    if (!nom) missingFields.push("nom");
+    if (!role) missingFields.push("role");
+
+    if (missingFields.length > 0) {
+      console.error("Champs manquants:", missingFields);
       return new Response(
         JSON.stringify({
-          error: "Tous les champs sont requis.",
-          details: { email, password, prenom, nom },
+          error: "Champs manquants",
+          details: {
+            missingFields,
+            receivedData: { email, prenom, nom, role },
+          },
         }),
         {
           status: 400,
@@ -138,11 +148,8 @@ serve(async (req: Request) => {
     // Création de l'utilisateur
     console.log("Création de l'utilisateur...");
     const { data: newUser, error: createUserError } =
-      await supabaseAdmin.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true,
-        user_metadata: {
+      await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+        data: {
           role: "client",
         },
       });

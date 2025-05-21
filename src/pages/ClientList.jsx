@@ -29,6 +29,7 @@ function ClientList() {
   });
   const [viewMode, setViewMode] = useState("card"); // "card" ou "list"
   const [poidsActuels, setPoidsActuels] = useState({});
+  const [activeTab, setActiveTab] = useState("programme");
 
   useEffect(() => {
     fetchClients();
@@ -89,13 +90,22 @@ function ClientList() {
 
   const handleCreateClient = async () => {
     const { email, prenom, nom } = formData;
-    const password = "secure-password"; // temporaire ou à générer
 
     try {
       const {
         data: { session },
       } = await supabase.auth.getSession();
       const jwt = session?.access_token;
+
+      const requestBody = {
+        email,
+        prenom,
+        nom,
+        role: "client",
+      };
+
+      console.log("Données envoyées:", requestBody);
+      console.log("JWT:", jwt);
 
       const response = await fetch(
         "https://csottmuidhsyamnabzww.functions.supabase.co/create-client",
@@ -105,19 +115,19 @@ function ClientList() {
             "Content-Type": "application/json",
             Authorization: `Bearer ${jwt}`,
           },
-          body: JSON.stringify({
-            email,
-            password,
-            prenom,
-            nom,
-            role: "client",
-          }),
+          body: JSON.stringify(requestBody),
         }
       );
 
       const result = await response.json();
+      console.log("Réponse du serveur:", result);
 
       if (!response.ok) {
+        console.error("Erreur complète:", {
+          status: response.status,
+          statusText: response.statusText,
+          result,
+        });
         alert(`❌ Erreur : ${result.error || JSON.stringify(result.details)}`);
         return;
       }
@@ -134,6 +144,88 @@ function ClientList() {
       console.error("Erreur lors de la création du client :", error);
       alert("❌ Erreur lors de la création du client");
     }
+  };
+
+  const renderTabContent = (client) => {
+    switch (activeTab) {
+      case "programme":
+        return (
+          <div className="p-4">
+            <h3 className="text-lg font-semibold mb-4">Programmes</h3>
+            {/* Contenu des programmes à implémenter */}
+            <p className="text-gray-500">
+              Aucun programme disponible pour le moment
+            </p>
+          </div>
+        );
+      case "evolution":
+        return (
+          <div className="p-4">
+            <h3 className="text-lg font-semibold mb-4">Évolution du poids</h3>
+            {poidsActuels[client.id] !== undefined &&
+            poidsActuels[client.id] !== null ? (
+              <div>
+                <p>Poids actuel : {poidsActuels[client.id]} kg</p>
+                {/* Graphique d'évolution à implémenter */}
+              </div>
+            ) : (
+              <p className="text-gray-500">Aucune donnée de poids disponible</p>
+            )}
+          </div>
+        );
+      case "nutrition":
+        return (
+          <div className="p-4">
+            <h3 className="text-lg font-semibold mb-4">Nutrition</h3>
+            <p className="text-gray-500">
+              Cette fonctionnalité sera bientôt disponible
+            </p>
+          </div>
+        );
+      case "morpho":
+        return (
+          <div className="p-4">
+            <h3 className="text-lg font-semibold mb-4">Morpho-anatomie</h3>
+            <p className="text-gray-500">
+              Cette fonctionnalité sera bientôt disponible
+            </p>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
+  const renderTabs = () => {
+    const tabs = [
+      { id: "programme", label: "Programme" },
+      { id: "evolution", label: "Évolution" },
+      { id: "nutrition", label: "Nutrition" },
+      { id: "morpho", label: "Morpho-anatomie" },
+    ];
+
+    return (
+      <div className="border-b border-gray-200">
+        <nav className="flex space-x-8" aria-label="Tabs">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`
+                py-4 px-1 border-b-2 font-medium text-sm
+                ${
+                  activeTab === tab.id
+                    ? "border-blue-500 text-blue-600"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                }
+              `}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </nav>
+      </div>
+    );
   };
 
   return (
