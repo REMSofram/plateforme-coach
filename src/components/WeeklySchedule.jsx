@@ -120,6 +120,88 @@ function WeeklySchedule({ clientId }) {
 
   const handleAddSession = async (date) => {
     try {
+      console.log('Tentative de création d\'une séance pour la date:', date);
+      
+      // Récupérer l'utilisateur connecté
+      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError || !authUser) {
+        throw new Error('Vous devez être connecté pour créer une séance');
+      }
+      
+      console.log('Utilisateur connecté:', authUser.id);
+      
+      // Vérifier que l'utilisateur est un coach
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', authUser.id)
+        .single();
+
+      if (userError || !userData) {
+        console.error('Erreur lors de la récupération du profil utilisateur:', userError);
+        throw new Error('Erreur lors de la vérification de votre profil');
+      }
+      
+      if (userData.role !== 'coach') {
+        throw new Error('Accès refusé : vous devez être un coach pour créer une séance');
+      }
+
+      console.log('Vérification du client et de la relation coach-client. Coach:', authUser.id, 'Client:', clientId);
+      
+      // 1. Vérifier d'abord que le client existe et a le bon rôle
+      const { data: clientData, error: clientError } = await supabase
+        .from('users')
+        .select('id, email, role')
+        .eq('id', clientId)
+        .eq('role', 'client')
+        .single();
+        
+      console.log('Résultat de la vérification du client:', { clientData, clientError });
+
+      if (clientError || !clientData) {
+        console.error('Client non trouvé ou rôle invalide:', clientError);
+        throw new Error('Client introuvable ou non autorisé');
+      }
+      
+      // 2. Vérifier la relation coach-client dans la table coach_clients
+      console.log('Vérification de la relation dans coach_clients...');
+      const { data: relationData, error: relationError } = await supabase
+        .from('coach_clients')
+        .select('*')
+        .eq('coach_id', authUser.id)
+        .eq('client_id', clientId);
+        
+      console.log('Résultat de la vérification de la relation coach_clients:', { 
+        coach_id: authUser.id, 
+        client_id: clientId,
+        relationData, 
+        relationError 
+      });
+
+      if (relationError) {
+        console.error('Erreur lors de la vérification de la relation:', relationError);
+        throw new Error('Erreur lors de la vérification des autorisations');
+      }
+      
+      if (!relationData || relationData.length === 0) {
+        console.error('Aucune relation coach-client trouvée pour cette paire');
+        // Créer automatiquement la relation si elle n'existe pas (pour le développement)
+        const { data: newRelation, error: createRelationError } = await supabase
+          .from('coach_clients')
+          .insert([
+            { coach_id: authUser.id, client_id: clientId }
+          ]);
+          
+        if (createRelationError) {
+          console.error('Échec de la création de la relation coach-client:', createRelationError);
+          throw new Error('Impossible de créer la relation avec ce client');
+        }
+        
+        console.log('Nouvelle relation coach-client créée:', newRelation);
+      }
+
+      // Si tout est bon, créer la session
       const { data, error } = await supabase
         .from("sessions")
         .insert([
@@ -144,6 +226,7 @@ function WeeklySchedule({ clientId }) {
       setSelectedSession(data);
     } catch (error) {
       console.error("Erreur lors de la création de la session:", error);
+      alert(error.message);
     }
   };
 
