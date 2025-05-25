@@ -316,22 +316,40 @@ const ClientDetail = () => {
             Retour à la liste
           </button>
           {/* Carte de profil */}
-          <div className="bg-white rounded-lg shadow-md p-6 mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-bold text-blue-700 mb-1">
-                {client.full_name}
-              </h1>
-              <p className="text-gray-600 mb-1">{client.email}</p>
-              <p className="text-gray-500 text-sm">
-                Compte créé le :{" "}
-                <span className="font-medium">{dateCreation}</span>
-              </p>
-            </div>
-            <div className="flex flex-col items-start md:items-end">
-              <span className="text-gray-500 text-sm mb-1">Poids actuel</span>
-              <span className="text-2xl font-semibold text-green-600">
-                {poidsActuel !== null ? `${poidsActuel} kg` : "Non renseigné"}
-              </span>
+          <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                <h1 className="text-2xl font-bold text-blue-700 mb-1">
+                  {client.full_name}
+                </h1>
+                <p className="text-gray-600 mb-1">{client.email}</p>
+                {client.birth_date && (
+                  <p className="text-gray-500 text-sm">
+                    Âge :{" "}
+                    <span className="font-medium">
+                      {Math.floor((new Date() - new Date(client.birth_date)) / (1000 * 60 * 60 * 24 * 365.25))} ans
+                    </span>
+                  </p>
+                )}
+                {client.injuries && (
+                  <p className="text-gray-500 text-sm">
+                    Blessures :{" "}
+                    <span className="font-medium">
+                      {client.injuries || "Aucune blessure signalée"}
+                    </span>
+                  </p>
+                )}
+                <p className="text-gray-500 text-sm">
+                  Compte créé le:{" "}
+                  <span className="font-medium">{dateCreation}</span>
+                </p>
+              </div>
+              <div className="flex flex-col items-start md:items-end">
+                <span className="text-gray-500 text-sm mb-1">Poids actuel</span>
+                <span className="text-2xl font-semibold text-green-600">
+                  {poidsActuel !== null ? `${poidsActuel} kg` : "Non renseigné"}
+                </span>
+              </div>
             </div>
           </div>
           {/* Onglets */}

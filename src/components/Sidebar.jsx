@@ -38,13 +38,14 @@ function Sidebar() {
     <div className="w-64 bg-white border-r border-gray-200 flex flex-col h-screen justify-between">
       <div>
         <div className="py-6 px-6">
-          <button
-            className="text-lg font-semibold text-blue-700 tracking-wide focus:outline-none"
-            onClick={handleGoHome}
-            style={{ width: "100%", textAlign: "left" }}
-          >
-            Application
-          </button>
+        <button
+          className="flex items-center text-lg font-semibold text-blue-700 tracking-wide focus:outline-none"
+          onClick={handleGoHome}
+          style={{ width: "100%", textAlign: "left", gap: "8px" }}
+        >
+          <img src="/logo_rd_coaching.png" alt="RD Coaching" className="h-8 w-8" />
+          RD Coaching
+        </button>
         </div>
         <nav className="px-4">
           <ul className="space-y-2">

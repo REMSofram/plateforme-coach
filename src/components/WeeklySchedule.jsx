@@ -25,6 +25,11 @@ function WeeklySchedule({ clientId }) {
     startOfWeek(new Date(), { weekStartsOn: 1 })
   );
   const [selectedSession, setSelectedSession] = useState(null);
+  
+  // États pour la suppression
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [sessionToDelete, setSessionToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -231,14 +236,78 @@ function WeeklySchedule({ clientId }) {
   };
 
   const handleSessionClick = (session) => {
-    setSelectedSession(session);
+    console.log('handleSessionClick appelé avec session:', session);
+    console.log('Session actuellement sélectionnée:', selectedSession);
+    
+    // Vérifier si la session est déjà sélectionnée
+    const isSameSession = selectedSession && selectedSession.id === session.id;
+    console.log('Est-ce la même session?', isSameSession);
+    
+    if (isSameSession) {
+      console.log('Désélection de la session');
+      setSelectedSession(null);
+    } else {
+      console.log('Nouvelle session sélectionnée');
+      setSelectedSession(session);
+    }
   };
-
-  const handleUpdateSession = async (updatedSession) => {
+  
+  const handleDeleteClick = (session) => {
+    setSessionToDelete(session);
+    setShowDeleteModal(true);
+  };
+  
+  const handleDeleteSession = async () => {
+    if (!sessionToDelete) return;
+    
+    setIsDeleting(true);
     try {
       const { error } = await supabase
         .from("sessions")
-        .update(updatedSession)
+        .delete()
+        .eq("id", sessionToDelete.id);
+
+      if (error) throw error;
+
+      // Mettre à jour l'état local
+      setSessions(prev => {
+        const newSessions = { ...prev };
+        const dateStr = format(parseISO(sessionToDelete.date), "yyyy-MM-dd");
+        if (newSessions[dateStr]) {
+          newSessions[dateStr] = newSessions[dateStr].filter(
+            s => s.id !== sessionToDelete.id
+          );
+        }
+        return newSessions;
+      });
+
+      // Fermer la modale et réinitialiser
+      setShowDeleteModal(false);
+      setSessionToDelete(null);
+      
+      // Désélectionner la session supprimée si elle était sélectionnée
+      if (selectedSession?.id === sessionToDelete.id) {
+        setSelectedSession(null);
+      }
+      
+    } catch (error) {
+      console.error("Erreur lors de la suppression de la séance:", error);
+      alert("Erreur lors de la suppression de la séance");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleUpdateSession = async (updatedSession) => {
+    if (!updatedSession) return;
+
+    try {
+      const { error } = await supabase
+        .from("sessions")
+        .update({
+          title: updatedSession.title,
+          description: updatedSession.description,
+        })
         .eq("id", updatedSession.id);
 
       if (error) throw error;
@@ -247,15 +316,21 @@ function WeeklySchedule({ clientId }) {
       setSessions((prev) => {
         const newSessions = { ...prev };
         const dateStr = format(parseISO(updatedSession.date), "yyyy-MM-dd");
-        newSessions[dateStr] = newSessions[dateStr].map((s) =>
-          s.id === updatedSession.id ? updatedSession : s
-        );
+        if (newSessions[dateStr]) {
+          newSessions[dateStr] = newSessions[dateStr].map((s) =>
+            s.id === updatedSession.id ? updatedSession : s
+          );
+        }
         return newSessions;
       });
 
-      setSelectedSession(updatedSession);
+      // Mettre à jour la session sélectionnée si c'est la même
+      if (selectedSession?.id === updatedSession.id) {
+        setSelectedSession(updatedSession);
+      }
     } catch (error) {
-      console.error("Erreur lors de la mise à jour de la session:", error);
+      console.error("Erreur lors de la mise à jour de la séance:", error);
+      alert("Erreur lors de la mise à jour de la séance");
     }
   };
 
@@ -325,7 +400,8 @@ function WeeklySchedule({ clientId }) {
                           key={session.id}
                           session={session}
                           date={dateStr}
-                          onClick={() => handleSessionClick(session)}
+                          onClick={handleSessionClick}
+                          onDelete={handleDeleteClick}
                           isSelected={selectedSession?.id === session.id}
                         />
                       ))}
@@ -344,6 +420,39 @@ function WeeklySchedule({ clientId }) {
         </div>
       </DndContext>
 
+      {/* Modale de confirmation de suppression */}
+      {showDeleteModal && sessionToDelete && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold text-red-600 mb-4">
+              Supprimer la séance
+            </h3>
+            <p className="mb-6">
+              Êtes-vous sûr de vouloir supprimer cette séance ? Cette action est irréversible.
+            </p>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setSessionToDelete(null);
+                }}
+                className="px-4 py-2 rounded bg-gray-200 text-gray-800 hover:bg-gray-300"
+                disabled={isDeleting}
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleDeleteSession}
+                className="px-4 py-2 rounded bg-red-600 text-white hover:bg-red-700"
+                disabled={isDeleting}
+              >
+                {isDeleting ? 'Suppression...' : 'Supprimer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Panneau de détails de la séance */}
       {selectedSession && (
         <div className="mt-8 bg-white rounded-lg shadow-md p-6">
@@ -351,25 +460,42 @@ function WeeklySchedule({ clientId }) {
             <h2 className="text-xl font-semibold text-blue-700">
               Détails de la séance
             </h2>
-            <button
-              onClick={() => setSelectedSession(null)}
-              className="text-gray-500 hover:text-gray-700"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-6 w-6"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
+            <div className="flex space-x-2">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDeleteClick(selectedSession);
+                }}
+                className="text-red-500 hover:text-red-700 p-1 rounded-full hover:bg-red-100"
+                title="Supprimer la séance"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedSession(null);
+                }}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-6 w-6"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
           </div>
           <div className="space-y-4">
             <div>
@@ -403,40 +529,6 @@ function WeeklySchedule({ clientId }) {
                 rows={4}
                 className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Heure de début
-                </label>
-                <input
-                  type="time"
-                  value={selectedSession.start_time || ""}
-                  onChange={(e) =>
-                    handleUpdateSession({
-                      ...selectedSession,
-                      start_time: e.target.value,
-                    })
-                  }
-                  className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Heure de fin
-                </label>
-                <input
-                  type="time"
-                  value={selectedSession.end_time || ""}
-                  onChange={(e) =>
-                    handleUpdateSession({
-                      ...selectedSession,
-                      end_time: e.target.value,
-                    })
-                  }
-                  className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
             </div>
           </div>
         </div>
