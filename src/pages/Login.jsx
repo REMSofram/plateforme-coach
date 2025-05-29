@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 
 const Login = () => {
@@ -7,32 +8,56 @@ const Login = () => {
   const [isSignUp, setIsSignUp] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
   const handleAuth = async (e) => {
     e.preventDefault();
     setError("");
     setMessage("");
+    setLoading(true);
 
-    if (isSignUp) {
-      // Sign up
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-      });
-      if (error) {
-        setError(error.message);
+    try {
+      if (isSignUp) {
+        // Inscription
+        const { error: signUpError } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: window.location.origin + '/profil',
+          },
+        });
+        
+        if (signUpError) throw signUpError;
+        
+        setMessage("Un email de confirmation a été envoyé. Vérifiez votre boîte mail pour confirmer votre inscription.");
       } else {
-        setMessage("Compte créé ! Vérifie tes mails pour valider ton adresse.");
+        // Connexion
+        const { data, error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        
+        if (signInError) throw signInError;
+        
+        // Rediriger vers la page d'accueil après connexion réussie
+        navigate('/');
       }
-    } else {
-      // Login
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      if (error) {
-        setError(error.message);
+    } catch (error) {
+      console.error("Erreur d'authentification:", error);
+      
+      // Messages d'erreur plus conviviaux
+      if (error.message.includes('Invalid login credentials')) {
+        setError("Email ou mot de passe incorrect.");
+      } else if (error.message.includes('Email not confirmed')) {
+        setError("Veuillez vérifier votre email pour confirmer votre inscription avant de vous connecter.");
+      } else if (error.message.includes('Email rate limit exceeded')) {
+        setError("Trop de tentatives. Veuillez réessayer plus tard.");
+      } else {
+        setError(error.message || "Une erreur est survenue lors de l'authentification");
       }
+    } finally {
+      setLoading(false);
     }
   };
 
