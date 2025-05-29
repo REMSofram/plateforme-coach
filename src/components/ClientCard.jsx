@@ -88,10 +88,9 @@ function ClientCard({ client, onClientDeleted }) {
       </div>
 
       <Link to={`/client/${client.id}`} className="block">
-        <h3 className="text-xl font-semibold text-gray-800 mb-2">
+        <h3 className="text-xl font-semibold text-gray-800">
           {client.full_name}
         </h3>
-        <p className="text-gray-600">{client.email}</p>
       </Link>
 
       {/* Modale de confirmation de suppression */}

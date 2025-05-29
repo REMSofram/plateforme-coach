@@ -31,6 +31,26 @@ function WeeklySchedule({ clientId }) {
   const [sessionToDelete, setSessionToDelete] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // États pour la duplication
+  const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+  const [duplicateOptions, setDuplicateOptions] = useState({
+    repeat: 'none', // 'none', 'weekly', 'biweekly', 'monthly'
+    occurrences: 4,
+    startDate: ''
+  });
+  const [isDuplicating, setIsDuplicating] = useState(false);
+  
+  // État pour les notifications
+  const [notification, setNotification] = useState({ show: false, message: '', type: 'success' });
+  
+  // Afficher une notification temporaire
+  const showNotification = (message, type = 'success', duration = 5000) => {
+    setNotification({ show: true, message, type });
+    setTimeout(() => {
+      setNotification(prev => ({ ...prev, show: false }));
+    }, duration);
+  };
+
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
@@ -252,9 +272,108 @@ function WeeklySchedule({ clientId }) {
     }
   };
   
-  const handleDeleteClick = (session) => {
+  const handleDeleteClick = (session, e) => {
+    e.stopPropagation();
     setSessionToDelete(session);
     setShowDeleteModal(true);
+  };
+  
+  const handleDuplicateClick = (session, e) => {
+    e.stopPropagation();
+    setSessionToDelete(session);
+    setDuplicateOptions({
+      ...duplicateOptions,
+      startDate: session.date,
+      repeat: 'none',
+      occurrences: 4
+    });
+    setShowDuplicateModal(true);
+  };
+
+  const handleDuplicateSession = async () => {
+    if (!sessionToDelete) return;
+    
+    setIsDuplicating(true);
+    try {
+      const { repeat, occurrences, startDate } = duplicateOptions;
+      const baseSession = { ...sessionToDelete };
+      delete baseSession.id; // Supprimer l'ID pour en créer un nouveau
+      
+      const sessionsToCreate = [];
+      const baseDate = new Date(startDate);
+      
+      // Si pas de récurrence, on crée juste une copie pour le jour suivant
+      if (repeat === 'none') {
+        const nextDay = new Date(baseDate);
+        nextDay.setDate(baseDate.getDate() + 1); // Créer pour le jour suivant
+        
+        sessionsToCreate.push({
+          ...baseSession,
+          date: nextDay.toISOString().split('T')[0]
+        });
+      } else {
+        // Calculer les dates de récurrence
+        for (let i = 1; i <= occurrences; i++) {
+          const newDate = new Date(baseDate);
+          
+          // Ajouter le délai en fonction du type de récurrence
+          switch (repeat) {
+            case 'weekly':
+              newDate.setDate(baseDate.getDate() + (i * 7));
+              break;
+            case 'biweekly':
+              newDate.setDate(baseDate.getDate() + (i * 14));
+              break;
+            case 'monthly':
+              newDate.setMonth(baseDate.getMonth() + i);
+              break;
+            default:
+              break;
+          }
+          
+          sessionsToCreate.push({
+            ...baseSession,
+            date: newDate.toISOString().split('T')[0]
+          });
+        }
+      }
+      
+      // Insérer les nouvelles sessions
+      const { data, error } = await supabase
+        .from('sessions')
+        .insert(sessionsToCreate)
+        .select();
+        
+      if (error) throw error;
+      
+      // Mettre à jour l'état local avec les nouvelles sessions
+      setSessions(prev => {
+        const newSessions = { ...prev };
+        
+        data.forEach(session => {
+          const dateStr = format(parseISO(session.date), 'yyyy-MM-dd');
+          if (!newSessions[dateStr]) {
+            newSessions[dateStr] = [];
+          }
+          newSessions[dateStr].push(session);
+        });
+        
+        return newSessions;
+      });
+      
+      // Fermer la modale
+      setShowDuplicateModal(false);
+      setSessionToDelete(null);
+      
+      // Afficher une notification de succès
+      const successMessage = `Séance${occurrences > 1 ? 's' : ''} dupliquée${occurrences > 1 ? 's' : ''} avec succès !`;
+      showNotification(successMessage, 'success');
+    } catch (error) {
+      console.error('Erreur lors de la duplication de la séance:', error);
+      showNotification('Erreur lors de la duplication de la séance', 'error');
+    } finally {
+      setIsDuplicating(false);
+    }
   };
   
   const handleDeleteSession = async () => {
@@ -338,8 +457,39 @@ function WeeklySchedule({ clientId }) {
     return <div className="p-4">Chargement...</div>;
   }
 
+  // Styles pour les notifications
+  const notificationStyles = {
+    success: 'bg-green-100 border-green-500 text-green-700',
+    error: 'bg-red-100 border-red-500 text-red-700',
+    info: 'bg-blue-100 border-blue-500 text-blue-700'
+  };
+
   return (
-    <div className="p-4">
+    <div className="p-4 relative">
+      {/* Notification */}
+      {notification.show && (
+        <div 
+          className={`fixed top-4 right-4 border-l-4 p-4 rounded shadow-lg z-50 ${notificationStyles[notification.type]}`}
+          style={{ minWidth: '300px' }}
+        >
+          <div className="flex justify-between items-start">
+            <div className="flex-1">
+              <p className="font-medium">
+                {notification.type === 'success' ? 'Succès' : 'Erreur'}
+              </p>
+              <p className="text-sm">{notification.message}</p>
+            </div>
+            <button
+              onClick={() => setNotification(prev => ({ ...prev, show: false }))}
+              className="ml-4 text-gray-500 hover:text-gray-700"
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
       <div className="flex justify-between mb-4">
         <button
           onClick={() => setCurrentWeekStart(addDays(currentWeekStart, -7))}
@@ -364,6 +514,10 @@ function WeeklySchedule({ clientId }) {
           {weekDays.map((day) => {
             const dateStr = format(day, "yyyy-MM-dd");
             const daySessions = sessions[dateStr] || [];
+            // Créer une clé unique pour chaque session en incluant la date et l'ID
+            const sortedSessions = [...daySessions].sort((a, b) => 
+              new Date(a.created_at || 0) - new Date(b.created_at || 0)
+            );
 
             return (
               <div
@@ -389,19 +543,20 @@ function WeeklySchedule({ clientId }) {
                     {format(day, "EEEE d MMMM", { locale: fr })}
                   </div>
                   <SortableContext
-                    items={daySessions.map(
-                      (session) => `${dateStr}-${session.id}`
+                    items={sortedSessions.map(
+                      (session) => `session-${dateStr}-${session.id}`
                     )}
                     strategy={verticalListSortingStrategy}
                   >
                     <div className="space-y-2">
-                      {daySessions.map((session) => (
+                      {sortedSessions.map((session) => (
                         <SessionCard
-                          key={session.id}
+                          key={`${dateStr}-${session.id}-${session.created_at || ''}`}
                           session={session}
                           date={dateStr}
                           onClick={handleSessionClick}
                           onDelete={handleDeleteClick}
+                          onDuplicate={handleDuplicateClick}
                           isSelected={selectedSession?.id === session.id}
                         />
                       ))}
@@ -453,6 +608,89 @@ function WeeklySchedule({ clientId }) {
         </div>
       )}
 
+      {/* Modale de duplication de séance */}
+      {showDuplicateModal && sessionToDelete && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold text-blue-700 mb-4">
+              Dupliquer la séance
+            </h3>
+            
+            <div className="space-y-4 mb-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Répétition
+                </label>
+                <select
+                  value={duplicateOptions.repeat}
+                  onChange={(e) => setDuplicateOptions({
+                    ...duplicateOptions,
+                    repeat: e.target.value
+                  })}
+                  className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="none">Ne pas répéter</option>
+                  <option value="weekly">Toutes les semaines</option>
+                  <option value="biweekly">Toutes les 2 semaines</option>
+                  <option value="monthly">Tous les mois</option>
+                </select>
+              </div>
+              
+              {duplicateOptions.repeat !== 'none' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Nombre d'occurrences (max 12)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="12"
+                    value={duplicateOptions.occurrences}
+                    onChange={(e) => setDuplicateOptions({
+                      ...duplicateOptions,
+                      occurrences: Math.min(12, Math.max(1, parseInt(e.target.value) || 1))
+                    })}
+                    className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              )}
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Date de début
+                </label>
+                <input
+                  type="date"
+                  value={duplicateOptions.startDate}
+                  onChange={(e) => setDuplicateOptions({
+                    ...duplicateOptions,
+                    startDate: e.target.value
+                  })}
+                  className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+            
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => setShowDuplicateModal(false)}
+                className="px-4 py-2 rounded bg-gray-200 text-gray-800 hover:bg-gray-300"
+                disabled={isDuplicating}
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleDuplicateSession}
+                className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700"
+                disabled={isDuplicating}
+              >
+                {isDuplicating ? 'Duplication en cours...' : 'Dupliquer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
       {/* Panneau de détails de la séance */}
       {selectedSession && (
         <div className="mt-8 bg-white rounded-lg shadow-md p-6">
@@ -462,10 +700,16 @@ function WeeklySchedule({ clientId }) {
             </h2>
             <div className="flex space-x-2">
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleDeleteClick(selectedSession);
-                }}
+                onClick={(e) => handleDuplicateClick(selectedSession, e)}
+                className="text-blue-500 hover:text-blue-700 p-1 rounded-full hover:bg-blue-100"
+                title="Dupliquer la séance"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+              </button>
+              <button
+                onClick={(e) => handleDeleteClick(selectedSession, e)}
                 className="text-red-500 hover:text-red-700 p-1 rounded-full hover:bg-red-100"
                 title="Supprimer la séance"
               >
