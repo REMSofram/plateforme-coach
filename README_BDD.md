@@ -1,68 +1,72 @@
-# 📦 Documentation de la base de données – Plateforme Coach
+# 📊 Base de Données – Plateforme Coach
 
-## Table `users`
-> Contient les données générales de tous les utilisateurs (coach ou client).
-
-| Champ        | Type       | Obligatoire | Par défaut      | Description                                      |
-|--------------|------------|-------------|------------------|--------------------------------------------------|
-| id           | `uuid`     | ✅           | -                | Identifiant unique utilisateur, lié à auth.id    |
-| auth_id      | `uuid`     | ❌           | -                | ID auth Supabase (doublon avec `id`)             |
-| role         | `text`     | ✅           | -                | Rôle de l’utilisateur : `coach` ou `client`      |
-| full_name    | `text`     | ❌           | -                | Nom complet                                      |
-| email        | `text`     | ✅           | -                | Email de l’utilisateur                           |
-| created_at   | `timestamptz` | ✅       | `now()`          | Date de création                                 |
-| weight       | `numeric`  | ❌           | -                | Poids de référence de l’utilisateur              |
-| birth_date   | `date`     | ❌           | -                | Date de naissance                                |
-| injuries     | `text`     | ❌           | -                | Notes libres sur les blessures potentielles      |
-
-### Relations
-- `id` est lié à `auth.users.id`
-- Utilisé comme clé étrangère dans : `poids_logs`, `coach_clients`
-
-### Remarques
-- La fonction `handle_new_user()` insert automatiquement un nouvel utilisateur dans cette table à la création Auth.
----
-
-## Table `coach_clients`
-> Associe un coach à ses clients (relation N:N managée par la plateforme).
-
-| Champ       | Type       | Obligatoire | Par défaut | Description                                  |
-|-------------|------------|-------------|------------|----------------------------------------------|
-| id          | `uuid`     | ✅           | -          | Identifiant unique de la relation            |
-| coach_id    | `uuid`     | ✅           | -          | Référence à `users.id` du coach              |
-| client_id   | `uuid`     | ✅           | -          | Référence à `users.id` du client             |
-| created_at  | `timestamptz` | ✅       | `now()`    | Date de création de la relation              |
-
-### Relations
-- `coach_id` et `client_id` → `users.id`
-
-### Remarques
-- Permet une visualisation claire des clients pour chaque coach dans le dashboard.
----
-
-## Table `poids_logs`
-> Journal de suivi du poids d’un utilisateur.
-
-| Champ       | Type       | Obligatoire | Par défaut | Description                                  |
-|-------------|------------|-------------|------------|----------------------------------------------|
-| id          | `uuid`     | ✅           | -          | ID unique du log                             |
-| user_id     | `uuid`     | ✅           | -          | Référence à l’utilisateur (`users.id`)       |
-| date        | `date`     | ✅           | -          | Date du log                                   |
-| poids       | `numeric`  | ✅           | -          | Poids mesuré (en kg)                          |
-| note        | `text`     | ❌           | -          | Note libre (ressenti, alimentation, etc.)     |
-| created_at  | `timestamptz` | ✅       | `now()`    | Timestamp de la création du log              |
-
-### Relations
-- `user_id` → `users.id`
+Voici le schéma de la base de données actuelle utilisée dans Supabase pour la plateforme :
 
 ---
 
-## Fonction `handle_new_user()`
-> Trigger automatique à la création d'un nouvel utilisateur dans `auth.users`.
+## 🔐 Table `auth.users` (gérée par Supabase)
 
-```sql
-begin
-  insert into public.users (id, email)
-  values (new.id, new.email);
-  return new;
-end;
+Contient les informations d'authentification. Les tables suivantes y font référence via l'`id`.
+
+---
+
+## 👤 Table `users`
+
+| Colonne      | Type     | Description                        |
+|--------------|----------|------------------------------------|
+| id           | uuid     | Identifiant interne                |
+| auth_id      | uuid     | Référence à `auth.users.id`        |
+| role         | text     | 'coach' ou 'client'                |
+| full_name    | text     | Nom complet                        |
+| email        | text     | Email                              |
+| created_at   | timestamptz | Date de création du profil     |
+| weight       | numeric  | Poids actuel                       |
+| birth_date   | date     | Date de naissance                  |
+| injuries     | text     | Antécédents de blessures (optionnel) |
+
+---
+
+## 🏋️ Table `coach_clients`
+
+| Colonne     | Type     | Description                          |
+|-------------|----------|--------------------------------------|
+| id          | uuid     | Clé primaire                         |
+| coach_id    | uuid     | Référence à `auth.users.id` (coach)  |
+| client_id   | uuid     | Référence à `auth.users.id` (client) |
+| created_at  | timestamptz | Date d’association coach/client |
+
+---
+
+## 📝 Table `poids_logs`
+
+| Colonne     | Type     | Description                         |
+|-------------|----------|-------------------------------------|
+| id          | uuid     | Clé primaire                        |
+| user_id     | uuid     | Référence à `users.id`              |
+| date        | date     | Date du relevé                      |
+| poids       | numeric  | Poids enregistré (en kg)            |
+| note        | text     | Note optionnelle (ressenti, etc.)   |
+| created_at  | timestamptz | Date de création du log         |
+
+---
+
+## 📆 Table `sessions`
+
+| Colonne     | Type     | Description                         |
+|-------------|----------|-------------------------------------|
+| id          | uuid     | Clé primaire                        |
+| client_id   | uuid     | Référence à `auth.users.id` (client)|
+| title       | text     | Titre de la séance                  |
+| description | text     | Détails de la séance                |
+| date        | date     | Date prévue                         |
+| created_at  | timestamptz | Date de création                |
+| updated_at  | timestamptz | Dernière mise à jour            |
+
+---
+
+## 🔗 Relations clés
+
+- `users.auth_id` → `auth.users.id`
+- `coach_clients.coach_id` et `client_id` → `auth.users.id`
+- `poids_logs.user_id` → `users.id`
+- `sessions.client_id` → `auth.users.id`
