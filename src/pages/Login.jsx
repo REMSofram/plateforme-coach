@@ -28,7 +28,7 @@ const Login = () => {
           email,
           password,
           options: {
-            emailRedirectTo: window.location.origin + '/profil',
+            emailRedirectTo: import.meta.env.VITE_SITE_URL_PROD + '/profil',
           },
         });
         
@@ -72,17 +72,24 @@ const Login = () => {
     setLoading(true);
 
     try {
-      // Utilisation de l'URL du site en production
-      const siteUrl = window.location.hostname === 'localhost' 
-        ? window.location.origin 
-        : 'https://plateforme-coach.vercel.app';
-        
-      // S'assurer que l'URL se termine par un /
-      const cleanSiteUrl = siteUrl.endsWith('/') ? siteUrl.slice(0, -1) : siteUrl;
+      // Utilisation de l'URL de production pour la redirection
+      const siteUrl = import.meta.env.VITE_SITE_URL_PROD;
       
-      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
-        redirectTo: `${cleanSiteUrl}/update-password`,
+      // Créer l'URL de redirection complète
+      const redirectUrl = new URL(siteUrl + '/update-password');
+      
+      // Ajouter un paramètre pour forcer le rechargement
+      redirectUrl.searchParams.set('force_reload', Date.now());
+      
+      console.log("=== ENVOI EMAIL RESET ===");
+      console.log("Email:", resetEmail);
+      console.log("URL de redirection:", redirectUrl.toString());
+      
+      const { data, error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+        redirectTo: redirectUrl.toString(),
       });
+      
+      console.log("Réponse de resetPasswordForEmail:", { data, error });
       
       if (error) throw error;
       

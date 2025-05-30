@@ -13,31 +13,67 @@ const UpdatePassword = () => {
 
   // Vérifier si l'utilisateur est arrivé depuis un email de réinitialisation
   useEffect(() => {
+    console.log("=== DÉBUT UpdatePassword ===");
+    console.log("URL complète au chargement:", window.location.href);
+    
     const accessToken = searchParams.get("access_token");
     const refreshToken = searchParams.get("refresh_token");
     const type = searchParams.get("type");
+    const reload = searchParams.get("reload");
+
+    console.log("Paramètres de l'URL:", { 
+      accessToken: accessToken ? 'présent' : 'absent',
+      refreshToken: refreshToken ? 'présent' : 'absent',
+      type,
+      reload
+    });
 
     const handleSession = async () => {
-      if (type === "recovery" && accessToken && refreshToken) {
+      console.log("=== Début handleSession ===");
+      // Si on a des tokens, on tente de restaurer la session
+      if (accessToken && refreshToken && type === "recovery") {
         try {
-          // Restaurer la session depuis le lien de réinitialisation
-          const { error } = await supabase.auth.setSession({
+          console.log("Tentative de restauration de la session...");
+          
+          // D'abord, déconnecter toute session existante
+          await supabase.auth.signOut();
+          
+          // Puis restaurer la nouvelle session
+          const { data, error } = await supabase.auth.setSession({
             access_token: accessToken,
             refresh_token: refreshToken,
           });
           
+          console.log("Résultat de setSession:", { data, error });
+          
           if (error) throw error;
           
+          console.log("Session restaurée avec succès");
+          
           // Nettoyer l'URL après avoir établi la session
-          window.history.replaceState({}, document.title, "/update-password");
+          const cleanUrl = window.location.origin + "/update-password";
+          window.history.replaceState({}, document.title, cleanUrl);
+          console.log("URL nettoyée:", cleanUrl);
+          
+          // Forcer un re-render après un court délai
+          setTimeout(() => {
+            window.location.reload();
+          }, 500);
+          
         } catch (error) {
           console.error("Erreur lors de la restauration de la session:", error);
           setError("Le lien de réinitialisation est invalide ou a expiré.");
           navigate("/login");
         }
-      } else if (!accessToken || !refreshToken || type !== "recovery") {
-        // Rediriger vers la page de connexion si les paramètres sont manquants
-        navigate("/login");
+      } else {
+        // Vérifier si on a déjà une session valide
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          console.log("Aucune session valide, redirection vers /login");
+          navigate("/login");
+          return;
+        }
+        console.log("Session existante détectée");
       }
     };
     
