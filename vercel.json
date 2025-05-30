@@ -1,4 +1,11 @@
 {
+  "build": {
+    "env": {
+      "VITE_SUPABASE_URL": "https://csottmuidhsyamnabzww.supabase.co",
+      "VITE_SITE_URL": "https://plateforme-coach.vercel.app",
+      "VITE_SITE_URL_PROD": "https://plateforme-coach.vercel.app"
+    }
+  },
   "rewrites": [
     { 
       "source": "/update-password", 

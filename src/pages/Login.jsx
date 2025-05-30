@@ -70,16 +70,24 @@ const Login = () => {
     setError("");
     setMessage("");
     setLoading(true);
+    
+    console.log("Variables d'environnement:", {
+      VITE_SITE_URL: import.meta.env.VITE_SITE_URL,
+      VITE_SITE_URL_PROD: import.meta.env.VITE_SITE_URL_PROD,
+      NODE_ENV: import.meta.env.MODE
+    });
 
     try {
       // Utilisation de l'URL de production pour la redirection
       const siteUrl = import.meta.env.VITE_SITE_URL_PROD;
       
       // Créer l'URL de redirection complète
-      const redirectUrl = new URL(siteUrl + '/update-password');
+      const redirectUrl = new URL('/update-password', siteUrl);
       
       // Ajouter un paramètre pour forcer le rechargement
       redirectUrl.searchParams.set('force_reload', Date.now());
+      
+      console.log("URL de redirection construite:", redirectUrl.toString());
       
       console.log("=== ENVOI EMAIL RESET ===");
       console.log("Email:", resetEmail);
