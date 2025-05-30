@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-d
 import { useEffect, useState } from 'react';
 import { supabase } from './lib/supabaseClient';
 import Login from "./pages/Login";
+import UpdatePassword from "./pages/UpdatePassword";
 import Home from "./pages/Home";
 import ClientList from "./pages/ClientList";
 import ClientDetail from "./pages/ClientDetail";
@@ -38,6 +39,7 @@ function App() {
     <Router>
       <Routes>
         <Route path="/login" element={!session ? <Login /> : <Navigate to="/" replace />} />
+        <Route path="/update-password" element={!session ? <UpdatePassword /> : <Navigate to="/" replace />} />
         <Route path="/" element={session ? <Layout /> : <Navigate to="/login" replace />}>
           <Route index element={<Home />} />
           <Route path="clients" element={<ClientList />} />

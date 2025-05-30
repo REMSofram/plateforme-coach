@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 
@@ -9,6 +10,9 @@ const Login = () => {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showResetForm, setShowResetForm] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetSent, setResetSent] = useState(false);
   const navigate = useNavigate();
 
   const handleAuth = async (e) => {
@@ -61,8 +65,97 @@ const Login = () => {
     }
   };
 
+  const handlePasswordReset = async (e) => {
+    e.preventDefault();
+    setError("");
+    setMessage("");
+    setLoading(true);
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+        redirectTo: window.location.origin + '/update-password',
+      });
+      
+      if (error) throw error;
+      
+      setResetSent(true);
+      setMessage("Un email de réinitialisation a été envoyé. Vérifiez votre boîte mail.");
+    } catch (error) {
+      console.error("Erreur lors de la demande de réinitialisation:", error);
+      setError(error.message || "Une erreur est survenue lors de l'envoi de l'email de réinitialisation");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (showResetForm) {
+    return (
+      <div className="max-w-md mx-auto mt-20 p-6 border rounded shadow">
+        <h2 className="text-2xl font-bold mb-4 text-center">
+          Réinitialiser le mot de passe
+        </h2>
+        {!resetSent ? (
+          <form onSubmit={handlePasswordReset} className="flex flex-col gap-4">
+            <p className="text-gray-600">Entrez votre adresse email pour recevoir un lien de réinitialisation.</p>
+            <input
+              type="email"
+              placeholder="Email"
+              className="p-2 border rounded"
+              value={resetEmail}
+              onChange={(e) => setResetEmail(e.target.value)}
+              required
+            />
+            <div className="flex gap-2">
+              <button
+                type="button"
+                className="flex-1 bg-gray-200 text-gray-800 p-2 rounded hover:bg-gray-300"
+                onClick={() => {
+                  setShowResetForm(false);
+                  setResetEmail("");
+                  setError("");
+                  setMessage("");
+                }}
+              >
+                Annuler
+              </button>
+              <button
+                type="submit"
+                className="flex-1 bg-blue-600 text-white p-2 rounded hover:bg-blue-700 disabled:opacity-50"
+                disabled={loading}
+              >
+                {loading ? "Envoi en cours..." : "Envoyer le lien"}
+              </button>
+            </div>
+          </form>
+        ) : (
+          <div className="text-center">
+            <p className="text-green-500 mb-4">{message}</p>
+            <button
+              onClick={() => {
+                setShowResetForm(false);
+                setResetEmail("");
+                setResetSent(false);
+                setMessage("");
+              }}
+              className="text-blue-500 underline"
+            >
+              Retour à la connexion
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
-    <div className="max-w-md mx-auto mt-20 p-6 border rounded shadow">
+    <div className="max-w-md mx-auto mt-10 p-6 border rounded shadow">
+      <div className="flex justify-center mb-6">
+        <img 
+          src="/logo_rd_coaching.png" 
+          alt="RD Coaching Logo" 
+          className="h-24 w-auto" 
+        />
+      </div>
       <h2 className="text-2xl font-bold mb-4 text-center">
         {isSignUp ? "Créer un compte" : "Se connecter"}
       </h2>
@@ -97,11 +190,26 @@ const Login = () => {
         {isSignUp ? "Déjà un compte ?" : "Pas encore de compte ?"}{" "}
         <button
           className="text-blue-500 underline"
-          onClick={() => setIsSignUp(!isSignUp)}
+          onClick={() => {
+            setIsSignUp(!isSignUp);
+            setError("");
+            setMessage("");
+          }}
         >
           {isSignUp ? "Se connecter" : "Créer un compte"}
         </button>
       </p>
+      
+      {!isSignUp && (
+        <div className="mt-4 text-center">
+          <button
+            onClick={() => setShowResetForm(true)}
+            className="text-sm text-blue-500 hover:underline"
+          >
+            Mot de passe oublié ?
+          </button>
+        </div>
+      )}
     </div>
   );
 };
