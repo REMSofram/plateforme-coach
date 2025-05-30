@@ -77,8 +77,11 @@ const Login = () => {
         ? window.location.origin 
         : 'https://plateforme-coach.vercel.app';
         
+      // S'assurer que l'URL se termine par un /
+      const cleanSiteUrl = siteUrl.endsWith('/') ? siteUrl.slice(0, -1) : siteUrl;
+      
       const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
-        redirectTo: `${siteUrl}/update-password`,
+        redirectTo: `${cleanSiteUrl}/update-password`,
       });
       
       if (error) throw error;

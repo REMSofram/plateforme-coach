@@ -17,21 +17,31 @@ const UpdatePassword = () => {
     const refreshToken = searchParams.get("refresh_token");
     const type = searchParams.get("type");
 
-    if (type === "recovery" && accessToken && refreshToken) {
-      // Restaurer la session depuis le lien de réinitialisation
-      supabase.auth
-        .setSession({
-          access_token: accessToken,
-          refresh_token: refreshToken,
-        })
-        .catch((error) => {
+    const handleSession = async () => {
+      if (type === "recovery" && accessToken && refreshToken) {
+        try {
+          // Restaurer la session depuis le lien de réinitialisation
+          const { error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+          
+          if (error) throw error;
+          
+          // Nettoyer l'URL après avoir établi la session
+          window.history.replaceState({}, document.title, "/update-password");
+        } catch (error) {
           console.error("Erreur lors de la restauration de la session:", error);
           setError("Le lien de réinitialisation est invalide ou a expiré.");
-        });
-    } else if (type !== "recovery") {
-      // Rediriger vers la page de connexion si l'utilisateur n'est pas venu d'un email de réinitialisation
-      navigate("/login");
-    }
+          navigate("/login");
+        }
+      } else if (!accessToken || !refreshToken || type !== "recovery") {
+        // Rediriger vers la page de connexion si les paramètres sont manquants
+        navigate("/login");
+      }
+    };
+    
+    handleSession();
   }, [navigate, searchParams]);
 
   const handleSubmit = async (e) => {
