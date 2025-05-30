@@ -72,8 +72,13 @@ const Login = () => {
     setLoading(true);
 
     try {
+      // Utilisation de l'URL du site en production
+      const siteUrl = window.location.hostname === 'localhost' 
+        ? window.location.origin 
+        : 'https://plateforme-coach.vercel.app';
+        
       const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
-        redirectTo: window.location.origin + '/update-password',
+        redirectTo: `${siteUrl}/update-password`,
       });
       
       if (error) throw error;
